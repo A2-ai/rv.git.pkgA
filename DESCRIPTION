@@ -1,0 +1,10 @@
+Package: rv.git.pkgA
+Title: Package Which Only Depends On CRAN Packages
+Version: 0.0.0.9000
+Authors@R: 
+    person("Wes", "Cummings", , "wes@a2-ai.com", role = c("aut", "cre"))
+Description: This package only only depends on CRAN packages
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
