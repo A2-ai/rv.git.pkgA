@@ -1,6 +1,6 @@
 Package: rv.git.pkgA
 Title: Package Which Has No Dependencies
-Version: 0.0.4
+Version: 0.0.5
 Authors@R: 
     person("Wes", "Cummings", , "wes@a2-ai.com", role = c("aut", "cre"))
 Description: This package has no dependencies
