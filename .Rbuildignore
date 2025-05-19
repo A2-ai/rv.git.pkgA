@@ -1,3 +1,5 @@
 ^rv\.git\.pkgA\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+rproject.toml
+rv
