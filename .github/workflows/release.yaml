@@ -40,7 +40,11 @@ jobs:
           resave-data: false
           md5: true
           user: bob
-          metadata: '{"hello": "world", "num": 1}'
+          metadata: |
+            {
+              "library": "${{ steps.library.outputs.result }}",
+              "hello": "world"
+            }
 
       - name: echo output
         run: |
