@@ -1,0 +1,80 @@
+name: R Release Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for the release'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install the latest version of rv
+        uses: a2-ai/setup-rv@main
+
+      - name: sync
+        run: rv sync
+
+      - name: get library path
+        id: library
+        run: |
+          OUTPUT=$(rv library)
+          echo "result=$OUTPUT" >> $GITHUB_OUTPUT
+          echo $GITHUB_OUTPUT
+
+      - name: Run R Releaser
+        id: releaser
+        uses: A2-ai/r-releaser/build-src@main
+        with:
+          library: ${{ steps.library.outputs.result }}
+          resave-data: false
+          md5: true
+          user: github-action-builder
+          metadata: |
+            {
+              "githubref": "${{ github.ref_name }}",
+              "githubtag": "${{ github.event.inputs.tag }}"
+            }
+
+      - name: echo output
+        run: |
+          echo ${{ steps.releaser.outputs.tarball_path }}
+          echo ${{ steps.releaser.outputs.tarball_name }}
+      - name: create PACKAGE db
+        run: |
+          mkdir -p /tmp/repo/src/contrib
+          cp ${{steps.releaser.outputs.tarball_path}} /tmp/repo/src/contrib
+          cd /tmp/repo/src/contrib
+          Rscript -e 'tools::write_PACKAGES(validate = TRUE)'
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.releaser.outputs.tarball_path }}
+          asset_name: src/contrib/${{ steps.releaser.outputs.tarball_name }}
+          tag: ${{ github.event.inputs.tag }}
+          overwrite: true
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: /tmp/repo/src/contrib/PACKAGES
+          asset_name: src/contrib/PACKAGES
+          tag: ${{ github.event.inputs.tag }}
+          overwrite: true
