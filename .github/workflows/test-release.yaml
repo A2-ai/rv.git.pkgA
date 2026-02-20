@@ -10,7 +10,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -37,7 +37,7 @@ jobs:
           echo "result=$OUTPUT" >> $GITHUB_OUTPUT
           echo $GITHUB_OUTPUT
 
-      - name: Run R Releaser
+      - name: Run R Releaser build-src
         id: releaser
         uses: A2-ai/r-releaser/build-src@main
         with:
@@ -55,26 +55,50 @@ jobs:
         run: |
           echo ${{ steps.releaser.outputs.tarball_path }}
           echo ${{ steps.releaser.outputs.tarball_name }}
-      - name: create PACKAGE db
+      
+      - name: Run R Releaser build-bin
+        id: releaser-bin
+        uses: A2-ai/r-releaser/build-bin@build-binary
+        with:
+          library: ${{ steps.library.outputs.result }}
+          src_tarball_path: ${{ steps.releaser.outputs.tarball_path }}
+  
+      - name: echo output
         run: |
-          mkdir -p /tmp/repo/src/contrib
-          cp ${{steps.releaser.outputs.tarball_path}} /tmp/repo/src/contrib
-          cd /tmp/repo/src/contrib
-          Rscript -e 'tools::write_PACKAGES(validate = TRUE)'
+          echo ${{ steps.releaser-bin.outputs.binary_path }}
+          echo ${{ steps.releaser-bin.outputs.binary_name }}
+      
+      # - name: create PACKAGE db
+      #   run: |
+      #     mkdir -p /tmp/repo/src/contrib
+      #     cp ${{steps.releaser.outputs.tarball_path}} /tmp/repo/src/contrib
+      #     cd /tmp/repo/src/contrib
+      #     Rscript -e 'tools::write_PACKAGES(validate = TRUE)'
+
+      - name: Upload src tarball to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.releaser.outputs.tarball_path }}
+          # asset_name: src/contrib/${{ steps.releaser.outputs.tarball_name }}
+          asset_name: ${{ steps.releaser.outputs.tarball_name }}
+
+          tag: ${{ github.event.inputs.tag }}
+          overwrite: true
+      # - name: Upload binaries to release
+      #   uses: svenstaro/upload-release-action@v2
+      #   with:
+      #     repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #     file: /tmp/repo/src/contrib/PACKAGES
+      #     asset_name: src/contrib/PACKAGES
+      #     tag: ${{ github.event.inputs.tag }}
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ steps.releaser.outputs.tarball_path }}
-          asset_name: src/contrib/${{ steps.releaser.outputs.tarball_name }}
+          file: ${{ steps.releaser-bin.outputs.binary_path }}
+          asset_name: ${{ steps.releaser-bin.outputs.binary_name }}
           tag: ${{ github.event.inputs.tag }}
           overwrite: true
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: /tmp/repo/src/contrib/PACKAGES
-          asset_name: src/contrib/PACKAGES
-          tag: ${{ github.event.inputs.tag }}
-          overwrite: true
+  
