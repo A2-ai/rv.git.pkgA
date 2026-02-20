@@ -9,11 +9,12 @@ on:
         type: string
 
 jobs:
-  release:
+  build-src:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
-      pull-requests: write
+    outputs:
+      tarball_name: ${{ steps.releaser.outputs.tarball_name }}
 
     steps:
       - name: Checkout repository
@@ -23,6 +24,8 @@ jobs:
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.5"
 
       - name: Install the latest version of rv
         uses: a2-ai/setup-rv@main
@@ -35,7 +38,7 @@ jobs:
         run: |
           OUTPUT=$(rv library)
           echo "result=$OUTPUT" >> $GITHUB_OUTPUT
-          echo $GITHUB_OUTPUT
+          echo "Library path: $OUTPUT"
 
       - name: Run R Releaser build-src
         id: releaser
@@ -51,54 +54,109 @@ jobs:
               "githubtag": "${{ github.event.inputs.tag }}"
             }
 
-      - name: echo output
+      - name: Echo source outputs
         run: |
-          echo ${{ steps.releaser.outputs.tarball_path }}
-          echo ${{ steps.releaser.outputs.tarball_name }}
-      
-      - name: Run R Releaser build-bin
-        id: releaser-bin
-        uses: A2-ai/r-releaser/build-bin@build-binary
-        with:
-          library: ${{ steps.library.outputs.result }}
-          src_tarball_path: ${{ steps.releaser.outputs.tarball_path }}
-  
-      - name: echo output
-        run: |
-          echo ${{ steps.releaser-bin.outputs.binary_path }}
-          echo ${{ steps.releaser-bin.outputs.binary_name }}
-      
-      # - name: create PACKAGE db
-      #   run: |
-      #     mkdir -p /tmp/repo/src/contrib
-      #     cp ${{steps.releaser.outputs.tarball_path}} /tmp/repo/src/contrib
-      #     cd /tmp/repo/src/contrib
-      #     Rscript -e 'tools::write_PACKAGES(validate = TRUE)'
+          echo "${{ steps.releaser.outputs.tarball_path }}"
+          echo "${{ steps.releaser.outputs.tarball_name }}"
 
       - name: Upload src tarball to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.releaser.outputs.tarball_path }}
-          # asset_name: src/contrib/${{ steps.releaser.outputs.tarball_name }}
           asset_name: ${{ steps.releaser.outputs.tarball_name }}
-
           tag: ${{ github.event.inputs.tag }}
           overwrite: true
-      # - name: Upload binaries to release
-      #   uses: svenstaro/upload-release-action@v2
-      #   with:
-      #     repo_token: ${{ secrets.GITHUB_TOKEN }}
-      #     file: /tmp/repo/src/contrib/PACKAGES
-      #     asset_name: src/contrib/PACKAGES
-      #     tag: ${{ github.event.inputs.tag }}
 
-      - name: Upload binaries to release
+      - name: Upload src tarball as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-tarball
+          path: ${{ steps.releaser.outputs.tarball_path }}
+          if-no-files-found: error
+
+  build-bin:
+    name: build-bin (${{ matrix.platform }}, R ${{ matrix.r_version }})
+    needs: build-src
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: '["ubuntu-22.04"]'
+            r_version: "4.4"
+            platform: "ubuntu-22.04-x86_64"
+          - runner: '["ubuntu-22.04"]'
+            r_version: "4.5"
+            platform: "ubuntu-22.04-x86_64"
+          - runner: '["ubuntu-24.04"]'
+            r_version: "4.4"
+            platform: "ubuntu-24.04-x86_64"
+          - runner: '["ubuntu-24.04"]'
+            r_version: "4.5"
+            platform: "ubuntu-24.04-x86_64"
+          # - runner: '["self-hosted", "macOS", "ARM64"]'
+          #   r_version: "4.4"
+          #   platform: "macos-arm64-selfhosted"
+          # - runner: '["self-hosted", "macOS", "ARM64"]'
+          #   r_version: "4.5"
+          #   platform: "macos-arm64-selfhosted"
+    runs-on: ${{ fromJson(matrix.runner) }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup R (${{ matrix.r_version }})
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r_version }}
+
+      - name: Install the latest version of rv
+        uses: a2-ai/setup-rv@main
+
+      - name: sync
+        run: rv sync
+
+      - name: get library path
+        id: library
+        run: |
+          OUTPUT=$(rv library)
+          echo "result=$OUTPUT" >> $GITHUB_OUTPUT
+          echo "Library path: $OUTPUT"
+
+      - name: Download source tarball artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: source-tarball
+          path: dist-src
+
+      - name: Verify source tarball path
+        id: src-tarball
+        run: |
+          SRC_PATH="$GITHUB_WORKSPACE/dist-src/${{ needs.build-src.outputs.tarball_name }}"
+          test -f "$SRC_PATH"
+          echo "path=$SRC_PATH" >> $GITHUB_OUTPUT
+
+      - name: Run R Releaser build-bin (${{ matrix.platform }}, R ${{ matrix.r_version }})
+        id: releaser-bin
+        uses: A2-ai/r-releaser/build-bin@build-binary
+        with:
+          library: ${{ steps.library.outputs.result }}
+          src_tarball_path: ${{ steps.src-tarball.outputs.path }}
+
+      - name: Echo binary outputs
+        run: |
+          echo "${{ steps.releaser-bin.outputs.binary_path }}"
+          echo "${{ steps.releaser-bin.outputs.binary_name }}"
+
+      - name: Upload binary to release (${{ matrix.platform }}, R ${{ matrix.r_version }})
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.releaser-bin.outputs.binary_path }}
-          asset_name: ${{ steps.releaser-bin.outputs.binary_name }}
+          asset_name: ${{ matrix.platform }}-r${{ matrix.r_version }}-${{ steps.releaser-bin.outputs.binary_name }}
           tag: ${{ github.event.inputs.tag }}
           overwrite: true
-  
