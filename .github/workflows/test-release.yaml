@@ -117,6 +117,12 @@ jobs:
       - name: Install the latest version of rv
         uses: a2-ai/setup-rv@main
 
+      - name: replace-rversion
+        run: |
+          perl -i -pe 's|^r_version = "4\.[0-9\.]+"$|r_version = "${{ matrix.r_version }}"|' rproject.toml
+          cat rproject.toml
+        if: runner.os != 'Windows'
+
       - name: sync
         run: rv sync
 
