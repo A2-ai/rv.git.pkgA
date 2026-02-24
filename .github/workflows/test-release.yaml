@@ -179,17 +179,20 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Prepare manifest directory
+        run: mkdir -p "${{ github.workspace }}/manifests"
+
       - name: Download manifest artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: manifest-*
-          path: manifests
+          path: ${{ github.workspace }}/manifests
 
       - name: Merge manifests
         id: merge
         uses: A2-ai/r-releaser/merge-manifests@deploy-prism
         with:
-          manifest_dir: manifests
+          manifest_dir: ${{ github.workspace }}/manifests
 
       - name: Upload manifest to release
         uses: svenstaro/upload-release-action@v2
