@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name for the release'
+        description: "Tag name for the release"
         required: true
         type: string
 
@@ -15,6 +15,7 @@ jobs:
       contents: write
     outputs:
       tarball_name: ${{ steps.releaser.outputs.tarball_name }}
+      linking_to_deps: ${{ steps.releaser.outputs.linking_to_deps }}
 
     steps:
       - name: Checkout repository
@@ -54,11 +55,6 @@ jobs:
               "githubtag": "${{ github.event.inputs.tag }}"
             }
 
-      - name: Echo source outputs
-        run: |
-          echo "${{ steps.releaser.outputs.tarball_path }}"
-          echo "${{ steps.releaser.outputs.tarball_name }}"
-
       - name: Upload src tarball to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -73,6 +69,13 @@ jobs:
         with:
           name: source-tarball
           path: ${{ steps.releaser.outputs.tarball_path }}
+          if-no-files-found: error
+
+      - name: Upload manifest as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-source
+          path: manifest.json
           if-no-files-found: error
 
   build-bin:
@@ -152,18 +155,40 @@ jobs:
         with:
           library: ${{ steps.library.outputs.result }}
           src_tarball_path: ${{ steps.src-tarball.outputs.path }}
-
-      - name: Echo binary outputs
-        run: |
-          echo "${{ steps.releaser-bin.outputs.binary_path }}"
-          echo "${{ steps.releaser-bin.outputs.binary_name }}"
+          linking_to_deps: ${{ needs.build-src.outputs.linking_to_deps }}
 
       - name: Upload binary to release (${{ matrix.platform }}, R ${{ matrix.r_version }})
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.releaser-bin.outputs.binary_path }}
-          asset_name: ${{ matrix.platform }}-r${{ matrix.r_version }}-${{ steps.releaser-bin.outputs.binary_name }}
+          asset_name: ${{ steps.releaser-bin.outputs.binary_name }}
+          tag: ${{ github.event.inputs.tag }}
+          overwrite: true
+
+      - name: Upload manifest as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-${{ matrix.platform }}-r${{ matrix.r_version }}
+          path: manifest.json
+          if-no-files-found: error
+
+  finalize:
+    needs: [build-src, build-bin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Merge manifests
+        id: merge
+        uses: A2-ai/r-releaser/merge-manifests@deploy-prism
+
+      - name: Upload manifest to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.merge.outputs.manifest_path }}
+          asset_name: manifest.json
           tag: ${{ github.event.inputs.tag }}
           overwrite: true
 
