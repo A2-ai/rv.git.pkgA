@@ -173,8 +173,10 @@ jobs:
           path: manifest.json
           if-no-files-found: error
 
-  finalize:
+  finalize-manifests:
+    name: Publish manifest to release
     needs: [build-src, build-bin]
+    if: always() && needs.build-src.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -205,8 +207,8 @@ jobs:
 
   deploy-prism:
     name: Deploy to PRISM
-    needs: [build-src, build-bin]
-    if: always() && needs.build-src.result == 'success'
+    needs: [build-src, build-bin, finalize-manifests]
+    if: always() && needs.build-src.result == 'success' && needs.finalize-manifest.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
