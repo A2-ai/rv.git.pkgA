@@ -42,7 +42,7 @@ jobs:
 
       - name: Run R Releaser build-src
         id: releaser
-        uses: A2-ai/r-releaser/build-src@main
+        uses: A2-ai/r-releaser/build-src@deploy-prism
         with:
           library: ${{ steps.library.outputs.result }}
           resave-data: false
@@ -148,7 +148,7 @@ jobs:
 
       - name: Run R Releaser build-bin (${{ matrix.platform }}, R ${{ matrix.r_version }})
         id: releaser-bin
-        uses: A2-ai/r-releaser/build-bin@build-binary
+        uses: A2-ai/r-releaser/build-bin@deploy-prism
         with:
           library: ${{ steps.library.outputs.result }}
           src_tarball_path: ${{ steps.src-tarball.outputs.path }}
@@ -167,19 +167,19 @@ jobs:
           tag: ${{ github.event.inputs.tag }}
           overwrite: true
 
-  deploy-prism:
-    name: Deploy to PRISM
-    needs: [build-src, build-bin]
-    if: always() && needs.build-src.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Deploy to PRISM
-        uses: A2-ai/r-releaser/deploy-prism@deploy-prism
-        with:
-          prism_api_url: ${{ vars.PRISM_API_URL }}
-          auth_token: ${{ secrets.PRISM_API_TOKEN }}
-          release_tag: ${{ github.event.inputs.tag }}
-          create_edition: 'true'
-          latest_edition: 'true'
+  # deploy-prism:
+  #   name: Deploy to PRISM
+  #   needs: [build-src, build-bin]
+  #   if: always() && needs.build-src.result == 'success'
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     - name: Deploy to PRISM
+  #       uses: A2-ai/r-releaser/deploy-prism@deploy-prism
+  #       with:
+  #         prism_api_url: ${{ vars.PRISM_API_URL }}
+  #         auth_token: ${{ secrets.PRISM_API_TOKEN }}
+  #         release_tag: ${{ github.event.inputs.tag }}
+  #         create_edition: 'true'
+  #         latest_edition: 'true'
