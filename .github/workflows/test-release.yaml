@@ -179,9 +179,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Download manifest artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: manifest-*
+          path: manifests
+
       - name: Merge manifests
         id: merge
         uses: A2-ai/r-releaser/merge-manifests@deploy-prism
+        with:
+          manifest_dir: manifests
 
       - name: Upload manifest to release
         uses: svenstaro/upload-release-action@v2
