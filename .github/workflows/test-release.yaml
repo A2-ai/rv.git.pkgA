@@ -166,3 +166,20 @@ jobs:
           asset_name: ${{ matrix.platform }}-r${{ matrix.r_version }}-${{ steps.releaser-bin.outputs.binary_name }}
           tag: ${{ github.event.inputs.tag }}
           overwrite: true
+
+  deploy-prism:
+    name: Deploy to PRISM
+    needs: [build-src, build-bin]
+    if: always() && needs.build-src.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Deploy to PRISM
+        uses: A2-ai/r-releaser/deploy-prism@deploy-prism
+        with:
+          prism_api_url: ${{ vars.PRISM_API_URL }}
+          auth_token: ${{ secrets.PRISM_API_TOKEN }}
+          release_tag: ${{ github.event.inputs.tag }}
+          create_edition: 'true'
+          latest_edition: 'true'
